@@ -1,29 +1,30 @@
 package com.isalimzhanov.diskspaceprofiler.service;
 
 import com.isalimzhanov.diskspaceprofiler.model.Resource;
-import com.isalimzhanov.diskspaceprofiler.utils.FileUtils;
 import javafx.concurrent.Task;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
 public final class ResourceTraversalTask extends Task<Void> {
 
     private static final Logger LOGGER = LogManager.getLogger(ResourceTraversalTask.class);
-    private static final int PERCENTAGE_SCALE = 4;
-    private static final BigDecimal HUNDRED = new BigDecimal(100);
 
     private final Path rootPath;
-    private final Consumer<Resource> resourceHandler;
+    private final Consumer<Resource> addResourceConsumer, updateResourceConsumer;
+    private final FileService fileService;
 
-    public ResourceTraversalTask(Path rootPath, Consumer<Resource> resourceHandler) {
+    public ResourceTraversalTask(
+            Path rootPath, Consumer<Resource> addResourceConsumer,
+            Consumer<Resource> updateResourceConsumer, FileService fileService
+    ) {
         this.rootPath = rootPath;
-        this.resourceHandler = resourceHandler;
+        this.addResourceConsumer = addResourceConsumer;
+        this.updateResourceConsumer = updateResourceConsumer;
+        this.fileService = fileService;
     }
 
     @Override
@@ -31,8 +32,7 @@ public final class ResourceTraversalTask extends Task<Void> {
         LOGGER.info("Started traversing path: {}", rootPath);
         long startTime = System.currentTimeMillis();
         try {
-            long totalSize = FileUtils.getSizeInBytes(rootPath);
-            traverse(rootPath, totalSize);
+            traverse(rootPath);
         } catch (Exception e) {
             LOGGER.error("Failed to traverse path: {}", rootPath, e);
         }
@@ -41,33 +41,38 @@ public final class ResourceTraversalTask extends Task<Void> {
         return null;
     }
 
-    private void traverse(Path path, long totalSize) throws IOException {
-        if (!FileUtils.doesExists(path)) {
+    private long traverse(Path path) {
+        if (!fileService.doesExist(path)) {
             LOGGER.error("Path {} doesn't exists", path);
-            return;
+            return 0L;
         }
-        if (!FileUtils.isDirectory(path) && !FileUtils.isFile(path)) {
-            LOGGER.warn("Path {} is not a file or directory", path);
-            return;
+        try {
+            addResourceConsumer.accept(fileService.buildResource(path, null));
+            long size = calculateSize(path);
+            updateResourceConsumer.accept(fileService.buildResource(path, size));
+            return size;
+        } catch (Exception e) {
+            LOGGER.error("Failed to traverse path {}", path, e);
         }
-        Resource resource = createResource(path, totalSize);
-        resourceHandler.accept(resource);
-        for (Path child : FileUtils.getChildrenPaths(path)) {
-            traverse(child, totalSize);
-        }
+        return 0L;
     }
 
-    private Resource createResource(Path path, long totalSize) throws IOException {
-        long size = FileUtils.getSizeInBytes(path);
-        return new Resource(
-                FileUtils.getName(path),
-                size,
-                getSpaceUsagePercentage(size, totalSize),
-                path
-        );
+    private long calculateSize(Path path) throws IOException {
+        if (fileService.isFile(path)) {
+            return fileService.getFileSize(path);
+        }
+        if (fileService.isDirectory(path)) {
+            return calculateSizeOfDirectory(path);
+        }
+        LOGGER.warn("Path {} is not a file or directory", path);
+        return 0L;
     }
 
-    private BigDecimal getSpaceUsagePercentage(long size, long totalSize) {
-        return new BigDecimal(size).multiply(HUNDRED).divide(new BigDecimal(totalSize), PERCENTAGE_SCALE, RoundingMode.DOWN);
+    private long calculateSizeOfDirectory(Path path) throws IOException {
+        long size = 0;
+        for (Path child : fileService.getNestedPaths(path)) {
+            size += traverse(child);
+        }
+        return size;
     }
 }

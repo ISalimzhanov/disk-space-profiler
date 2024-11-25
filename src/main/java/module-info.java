@@ -8,8 +8,10 @@ module com.isalimzhanov.diskspaceprofiler {
     requires commons.collections;
     requires jdk.compiler;
     requires org.apache.logging.log4j.core;
-    requires java.validation;
+    requires org.apache.commons.lang3;
+    requires directory.watcher;
 
     opens com.isalimzhanov.diskspaceprofiler to javafx.fxml;
+    opens com.isalimzhanov.diskspaceprofiler.controller to javafx.fxml;
     exports com.isalimzhanov.diskspaceprofiler;
 }

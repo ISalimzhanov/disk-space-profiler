@@ -1,49 +1,66 @@
 package com.isalimzhanov.diskspaceprofiler.service;
 
 import com.isalimzhanov.diskspaceprofiler.model.Resource;
-import com.isalimzhanov.diskspaceprofiler.view.ResourceTreeView;
 import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeTableView;
 
 import java.nio.file.Path;
-import java.util.Deque;
-import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentMap;
 
 public final class ResourceTreeService {
 
-    private final Deque<TreeItem<Resource>> previousRoots;
-    private final Map<Path, TreeItem<Resource>> resourceMap;
+    private final ConcurrentLinkedDeque<TreeItem<Resource>> previousRoots;
+    private final ConcurrentMap<Path, TreeItem<Resource>> resourceMap;
 
-    public ResourceTreeService(Deque<TreeItem<Resource>> previousRoots, Map<Path, TreeItem<Resource>> resourceMap) {
+    public ResourceTreeService(ConcurrentLinkedDeque<TreeItem<Resource>> previousRoots, ConcurrentMap<Path, TreeItem<Resource>> resourceMap) {
         this.previousRoots = previousRoots;
         this.resourceMap = resourceMap;
     }
 
-    public void restorePreviousRoot(ResourceTreeView view) {
+    public void restorePreviousRoot(TreeTableView<Resource> treeTable) {
         if (!previousRoots.isEmpty()) {
-            view.setRoot(previousRoots.pop());
+            treeTable.setRoot(previousRoots.pop());
         }
     }
 
-    public void selectNewRoot(ResourceTreeView view) {
-        previousRoots.push(view.getRoot());
-        view.setSelectedItemToRoot();
+    public void openRootParent(TreeTableView<Resource> treeTable) {
+        if (treeTable.getRoot() == null) {
+            throw new IllegalStateException("Root is null");
+        }
+        previousRoots.push(treeTable.getRoot());
+        if (treeTable.getRoot().getParent() != null) {
+            treeTable.setRoot(treeTable.getRoot().getParent());
+        }
     }
 
-    public void addResourceToTree(Resource resource, ResourceTreeView view) {
+    public void selectNewRoot(TreeTableView<Resource> treeTable) {
+        previousRoots.push(treeTable.getRoot());
+        TreeItem<Resource> selectedItem = treeTable.getSelectionModel().getSelectedItem();
+        if (selectedItem != null && !selectedItem.isLeaf()) {
+            treeTable.setRoot(selectedItem);
+        }
+    }
+
+    public void addResourceToTree(Resource resource, TreeTableView<Resource> treeTable) {
         TreeItem<Resource> item = createTreeItem(resource);
         if (resourceMap.containsKey(resource.getPath().getParent())) {
-            view.addTreeItem(item, resourceMap.get(resource.getPath().getParent()));
+            addItemToParent(item, resourceMap.get(resource.getPath().getParent()));
         } else {
-            addItemToRoot(item, view);
+            addItemToRoot(item, treeTable);
         }
         resourceMap.put(resource.getPath(), item);
     }
 
-    private void addItemToRoot(TreeItem<Resource> item, ResourceTreeView view) {
-        if (view.getRoot() == null) {
-            view.setRoot(item);
+    private void addItemToParent(TreeItem<Resource> item, TreeItem<Resource> parent) {
+        parent.getChildren().add(item);
+    }
+
+    private void addItemToRoot(TreeItem<Resource> item, TreeTableView<Resource> treeTable) {
+        if (treeTable.getRoot() == null) {
+            treeTable.setRoot(item);
         } else {
-            view.addTreeItem(item, view.getRoot());
+            addItemToParent(item, treeTable.getRoot());
         }
     }
 
@@ -51,13 +68,43 @@ public final class ResourceTreeService {
         return new TreeItem<>(resource);
     }
 
-    public void openRootParent(ResourceTreeView view) {
-        if (view.getRoot() == null) {
-            throw new IllegalStateException("Root is null");
+    public void updateResourceInTree(Resource resource) {
+        TreeItem<Resource> item = resourceMap.get(resource.getPath());
+        item.setValue(resource);
+    }
+
+    public void updateResourceInTreeRecursively(Resource resource) {
+        TreeItem<Resource> item = resourceMap.get(resource.getPath());
+        updateResourceInTreeRecursively(resource, item);
+    }
+
+    private void updateResourceInTreeRecursively(Resource resource, TreeItem<Resource> item) {
+        Resource oldResource = item.getValue();
+        item.setValue(resource);
+        if (item.getParent() != null) {
+            TreeItem<Resource> parent = item.getParent();
+            Resource parentResource = parent.getValue();
+            long newParentSize = parentResource.getSize() - oldResource.getSize() + resource.getSize();
+            updateResourceInTreeRecursively(
+                    new Resource(parentResource.getDisplayName(), newParentSize, parentResource.getPath()),
+                    parent
+            );
         }
-        previousRoots.push(view.getRoot());
-        if (view.getRoot().getParent() != null) {
-            view.setRoot(view.getRoot().getParent());
+    }
+
+    public void updateResourceNameByPath(Path path, String newName) {
+        TreeItem<Resource> item = resourceMap.get(path);
+        Resource oldResource = item.getValue();
+        item.setValue(new Resource(newName, oldResource.getSize(), path));
+    }
+
+    public void deleteResourceByPath(Path path, TreeTableView<Resource> tableView) {
+        TreeItem<Resource> item = resourceMap.get(path);
+        if (item.getParent() == null) {
+            tableView.setRoot(null);
+        } else {
+            item.getParent().getChildren().remove(item);
         }
+        resourceMap.remove(path);
     }
 }

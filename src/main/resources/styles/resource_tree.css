@@ -8,9 +8,9 @@
 }
 
 .button-box {
-    -fx-spacing: 12;
-    -fx-padding: 10 0;
-    -fx-start-margin: 10;
+    -fx-spacing: 12px;
+    -fx-padding: 10px;
+    -fx-start-margin: 10px;
     -fx-background-color: #f0f0f0;
     -fx-border-color: #c8c8c8;
     -fx-border-width: 1px;
