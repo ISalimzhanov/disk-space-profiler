@@ -4,5 +4,5 @@
 <?import javafx.scene.text.Text?>
 
 <VBox xmlns="http://javafx.com/javafx/21">
-    <Text text="Disk Space Profiler" style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
+    <Text text="Disk Space Profiler" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-padding: 10px;"/>
 </VBox>

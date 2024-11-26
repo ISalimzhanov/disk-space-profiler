@@ -8,7 +8,7 @@ import com.isalimzhanov.diskspaceprofiler.util.ExecutorServiceUtils;
 import com.isalimzhanov.diskspaceprofiler.util.FormatUtils;
 import com.isalimzhanov.diskspaceprofiler.view.LoadingTableCell;
 import io.methvin.watcher.DirectoryChangeEvent;
-import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -17,6 +17,7 @@ import javafx.scene.control.TreeTableCell;
 import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableView;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.HBox;
 
 import java.io.IOException;
 import java.net.URL;
@@ -36,7 +37,10 @@ public final class ResourceTreeController implements Initializable {
     private final FileService fileService = new FileService();
 
     // FIXME get correct root
-    private final Path rootPath = Path.of("/home/iskander/IdeaProjects/SomeOtherFolder");
+    private final Path rootPath = Path.of("/home/iskander/IdeaProjects/Folder");
+
+    @FXML
+    public HBox warningBox;
 
     @FXML
     private Button goBackButton;
@@ -58,21 +62,24 @@ public final class ResourceTreeController implements Initializable {
         setupTreeTableColumns();
         setupEventHandlers();
         setupTraversalTask();
-        ExecutorServiceUtils.submit(this::setupRootWatcher);
+        setupRootWatcher();
     }
 
     private void setupRootWatcher() {
-        try {
+        ExecutorServiceUtils.submit(() -> {
             fileService.watchDirectory(rootPath, event -> {
                 switch (event.eventType()) {
                     case CREATE -> handleResourceCreatedEvent(event);
                     case MODIFY -> handleResourceModifiedEvent(event);
                     case DELETE -> handleResourceDeletedEvent(event);
+                    case OVERFLOW -> handleOverflowEvent(event);
                 }
             });
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        });
+    }
+
+    private void handleOverflowEvent(DirectoryChangeEvent event) {
+        // TODO
     }
 
     private void handleResourceDeletedEvent(DirectoryChangeEvent event) {
@@ -84,18 +91,19 @@ public final class ResourceTreeController implements Initializable {
             resourceTreeService.updateResourceNameByPath(event.path(), fileService.getName(event.path()));
         } else {
             Resource resource = fileService.buildResource(event.path(), fileService.getFileSize(event.path()));
-            resourceTreeService.updateResourceInTreeRecursively(resource);
+            resourceTreeService.updateResource(resource);
         }
     }
 
     private void handleResourceCreatedEvent(DirectoryChangeEvent event) throws IOException {
         long size = event.isDirectory() ? 0L : fileService.getFileSize(event.path());
         Resource resource = fileService.buildResource(event.path(), size);
-        resourceTreeService.addResourceToTree(resource, treeTable);
+        resourceTreeService.addOrUpdateResource(resource, treeTable);
     }
 
     private void setupTraversalTask() {
-        ResourceTraversalTask traversalTask = new ResourceTraversalTask(rootPath, this::addResource, this::updateResource, fileService);
+        ResourceTraversalTask traversalTask = new ResourceTraversalTask(rootPath, this::addResource, fileService);
+        traversalTask.setOnSucceeded(event -> warningBox.setVisible(false));
         ExecutorServiceUtils.submit(traversalTask);
     }
 
@@ -126,22 +134,28 @@ public final class ResourceTreeController implements Initializable {
     }
 
     private void setupTreeTableColumns() {
-        setupColumn(nameColumn, Resource::getDisplayName, null);
-        setupColumn(sizeColumn, Resource::getSize, () -> new LoadingTableCell<>(FormatUtils::formatSize));
+        setupColumn(nameColumn, Resource::getDisplayNameProperty, null);
+        setupColumn(sizeColumn, resource -> resource.getSizeProperty().asObject(), () -> new LoadingTableCell<>(FormatUtils::formatSize));
     }
 
-    private <T> void setupColumn(TreeTableColumn<Resource, T> column, Function<Resource, T> valueProvider, Supplier<TreeTableCell<Resource, T>> cellFactory) {
-        column.setCellValueFactory(cell -> new SimpleObjectProperty<>(valueProvider.apply(cell.getValue().getValue())));
+    private <T> void setupColumn(
+            TreeTableColumn<Resource, T> column,
+            Function<Resource, ObservableValue<T>> valueFactory,
+            Supplier<TreeTableCell<Resource, T>> cellFactory
+    ) {
+        column.setCellValueFactory(cell -> {
+            if (cell.getValue() != null && cell.getValue().getValue() != null) {
+                return valueFactory.apply(cell.getValue().getValue());
+            }
+            return null;
+        });
         if (cellFactory != null) {
             column.setCellFactory(cell -> cellFactory.get());
         }
     }
 
     public void addResource(Resource resource) {
-        resourceTreeService.addResourceToTree(resource, treeTable);
+        resourceTreeService.addResource(resource, treeTable);
     }
 
-    public void updateResource(Resource resource) {
-        resourceTreeService.updateResourceInTree(resource);
-    }
 }

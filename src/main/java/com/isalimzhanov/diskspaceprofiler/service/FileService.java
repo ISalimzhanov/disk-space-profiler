@@ -1,5 +1,6 @@
 package com.isalimzhanov.diskspaceprofiler.service;
 
+import com.isalimzhanov.diskspaceprofiler.exception.WatchingDirectoryFailedException;
 import com.isalimzhanov.diskspaceprofiler.model.Resource;
 import io.methvin.watcher.DirectoryChangeListener;
 import io.methvin.watcher.DirectoryWatcher;
@@ -61,7 +62,7 @@ public final class FileService {
         }
     }
 
-    public void watchDirectory(Path path, DirectoryChangeListener listener) throws IOException {
+    public void watchDirectory(Path path, DirectoryChangeListener listener) {
         LOGGER.info("Watching directory: {}", path);
         try {
             DirectoryWatcher watcher = DirectoryWatcher.builder()
@@ -71,16 +72,12 @@ public final class FileService {
             watcher.watchAsync();
         } catch (IOException e) {
             LOGGER.error("Failed to watch directory: {}", path, e);
-            throw e;
+            throw new WatchingDirectoryFailedException(path, e);
         }
     }
 
 
     public Resource buildResource(Path path, Long size) {
-        return new Resource(
-                getName(path),
-                size,
-                path
-        );
+        return Resource.create(getName(path), path, size);
     }
 }
