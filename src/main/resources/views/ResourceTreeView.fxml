@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.chart.PieChart?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TreeTableColumn?>
+<?import javafx.scene.control.TreeTableView?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.isalimzhanov.diskspaceprofiler.controller.ResourceTreeController"
+            stylesheets="@../styles/resource_tree.css" styleClass="resource-tree-view">
+    <top>
+        <VBox>
+            <HBox styleClass="button-box" xmlns:fx="http://javafx.com/fxml">
+                <Button fx:id="goBackButton">
+                    <graphic>
+                        <ImageView fitWidth="16" fitHeight="16">
+                            <Image url="@../images/back_arrow.png"/>
+                        </ImageView>
+                    </graphic>
+                </Button>
+                <Button fx:id="openParentButton">
+                    <graphic>
+                        <ImageView fitWidth="16" fitHeight="16">
+                            <Image url="@../images/open_parent.png"/>
+                        </ImageView>
+                    </graphic>
+                </Button>
+            </HBox>
+            <HBox styleClass="warning-box" fx:id="warningBox">
+                <ImageView fitWidth="16" fitHeight="16">
+                    <Image url="@../images/warning.png"/>
+                </ImageView>
+                <Label text="Disk profiling in progress, data could be invalid"/>
+            </HBox>
+        </VBox>
+    </top>
+    <center>
+        <TreeTableView fx:id="treeTable">
+            <columns>
+                <TreeTableColumn fx:id="nameColumn" text="Name"/>
+                <TreeTableColumn fx:id="sizeColumn" text="Size"/>
+            </columns>
+        </TreeTableView>
+    </center>
+    <right>
+        <PieChart fx:id="usagePieChart" title="Usage percentage"/>
+    </right>
+</BorderPane>
