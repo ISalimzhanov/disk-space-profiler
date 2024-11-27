@@ -6,35 +6,39 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Consumer;
 
 public final class ResourceTraversalTask extends Task<Void> {
 
     private static final Logger LOGGER = LogManager.getLogger(ResourceTraversalTask.class);
 
-    private final Path rootPath;
     private final Consumer<Resource> addResourceConsumer;
     private final FileService fileService;
 
-    public ResourceTraversalTask(
-            Path rootPath, Consumer<Resource> addResourceConsumer, FileService fileService
-    ) {
-        this.rootPath = rootPath;
+    public ResourceTraversalTask(Consumer<Resource> addResourceConsumer, FileService fileService) {
         this.addResourceConsumer = addResourceConsumer;
         this.fileService = fileService;
     }
 
     @Override
     protected Void call() {
-        LOGGER.info("Started traversing path: {}", rootPath);
+        LOGGER.info("Started traversal");
         long startTime = System.currentTimeMillis();
-        try {
-            traverse(rootPath);
-        } catch (Exception e) {
-            LOGGER.error("Failed to traverse path: {}", rootPath, e);
+        List<Path> rootPaths = fileService.getRootPaths();
+        if (rootPaths.size() > 1) {
+            addResourceConsumer.accept(Resource.create("", null, 0L));
         }
+        rootPaths.forEach(rootPath -> {
+                    try {
+                        traverse(rootPath);
+                    } catch (Exception e) {
+                        LOGGER.error("Failed to traverse path: {}", rootPath, e);
+                    }
+                }
+        );
         long endTime = System.currentTimeMillis();
-        LOGGER.info("Resource traversal finished successfully, in {}", endTime - startTime);
+        LOGGER.info("Resource traversal finished successfully, in {} ms", endTime - startTime);
         return null;
     }
 

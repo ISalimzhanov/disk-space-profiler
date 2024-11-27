@@ -27,7 +27,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.net.URL;
-import java.nio.file.Path;
 import java.util.Queue;
 import java.util.ResourceBundle;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,9 +46,6 @@ public final class ResourceTreeController implements Initializable {
     private final ResourceTreeService resourceTreeService = new ResourceTreeService(new ConcurrentLinkedDeque<>(), new ConcurrentHashMap<>());
     private final Queue<Runnable> uiUpdateQueue = new ConcurrentLinkedQueue<>();
     private final FileService fileService = new FileService();
-
-    // FIXME get correct root
-    private final Path rootPath = Path.of("/");
 
     @FXML
     public HBox warningBox;
@@ -81,7 +77,7 @@ public final class ResourceTreeController implements Initializable {
     }
 
     private void setupRootWatcher() {
-        ExecutorServiceUtils.submit(() -> fileService.watchDirectory(rootPath, event -> {
+        ExecutorServiceUtils.submit(() -> fileService.watchRootPaths(event -> {
             LOGGER.info("Handling directory change event: {}", event);
             try {
                 if (fileService.shouldSkip(event.path())) {
@@ -122,7 +118,7 @@ public final class ResourceTreeController implements Initializable {
     }
 
     private void setupTraversalTask() {
-        ResourceTraversalTask traversalTask = new ResourceTraversalTask(rootPath, resource -> scheduleUIUpdate(() -> addResource(resource)), fileService);
+        ResourceTraversalTask traversalTask = new ResourceTraversalTask(resource -> scheduleUIUpdate(() -> addResource(resource)), fileService);
         traversalTask.setOnSucceeded(event -> Platform.runLater(() -> warningBox.setVisible(false)));
         ExecutorServiceUtils.submit(traversalTask);
     }

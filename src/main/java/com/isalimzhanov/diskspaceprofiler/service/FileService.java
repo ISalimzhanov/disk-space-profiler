@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryIteratorException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -23,7 +24,7 @@ public final class FileService {
 
     private static final String[] WINDOWS_SYSTEM_CRITICAL_FOLDERS = new String[]{"C:\\$Recycle.Bin", "C:\\Windows\\System32"};
     private static final String[] MACOS_SYSTEM_CRITICAL_FOLDERS = new String[]{"/System", "/Library", "/private"};
-    private static final String[] LINUX_SYSTEM_CRITICAL_FOLDERS = new String[]{"/proc", "/sys", "/dev"};
+    private static final String[] LINUX_SYSTEM_CRITICAL_FOLDERS = new String[]{"/proc", "/sys", "/dev", "/run"};
 
     public boolean isDirectory(Path path) {
         return Files.isDirectory(path);
@@ -64,18 +65,20 @@ public final class FileService {
         }
     }
 
-    public void watchDirectory(Path path, DirectoryChangeListener listener) {
-        LOGGER.info("Watching directory: {}", path);
-        try {
-            DirectoryWatcher watcher = DirectoryWatcher.builder()
-                    .path(path)
-                    .listener(listener)
-                    .build();
-            watcher.watchAsync();
-        } catch (IOException e) {
-            LOGGER.error("Failed to watch directory: {}", path, e);
-            throw new WatchingDirectoryFailedException(path, e);
-        }
+    public void watchRootPaths(DirectoryChangeListener listener) {
+        getRootPaths().forEach(path -> {
+            LOGGER.info("Watching directory: {}", path);
+            try {
+                DirectoryWatcher watcher = DirectoryWatcher.builder()
+                        .path(path)
+                        .listener(listener)
+                        .build();
+                watcher.watchAsync();
+            } catch (IOException e) {
+                LOGGER.error("Failed to watch directory: {}", path, e);
+                throw new WatchingDirectoryFailedException(path, e);
+            }
+        });
     }
 
     public Resource buildResource(Path path, Long size) {
@@ -99,5 +102,11 @@ public final class FileService {
             return Arrays.stream(LINUX_SYSTEM_CRITICAL_FOLDERS).anyMatch(absolutePath::startsWith);
         }
         return false;
+    }
+
+    public List<Path> getRootPaths() {
+        List<Path> rootPaths = new ArrayList<>();
+        FileSystems.getDefault().getRootDirectories().forEach(rootPaths::add);
+        return rootPaths;
     }
 }
