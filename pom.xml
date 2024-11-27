@@ -19,6 +19,7 @@
         <sonar.plugin.version>3.9.0.2155</sonar.plugin.version>
         <sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
         <sonar.language>java</sonar.language>
+        <javapackager.version>1.7.6</javapackager.version>
     </properties>
 
     <dependencies>
@@ -92,6 +93,12 @@
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
@@ -155,6 +162,7 @@
                             <mainClass>
                                 com.isalimzhanov.diskspaceprofiler/com.isalimzhanov.diskspaceprofiler.DiskSpaceProfiler
                             </mainClass>
+                            <outputDirectory>/src/main/resources</outputDirectory>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
                             <jlinkImageName>app</jlinkImageName>

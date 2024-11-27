@@ -6,7 +6,6 @@ import javafx.scene.control.TreeTableCell;
 
 public class SizeTableCell extends TreeTableCell<Resource, Long> {
 
-
     @Override
     protected void updateItem(Long item, boolean empty) {
         super.updateItem(item, empty);
@@ -19,11 +18,9 @@ public class SizeTableCell extends TreeTableCell<Resource, Long> {
 
     private void clearContent() {
         setText(null);
-        setGraphic(null);
     }
 
     private void showItemContent(Long item) {
-        setGraphic(null);
         setText(FormatUtils.formatSize(item));
     }
 }
