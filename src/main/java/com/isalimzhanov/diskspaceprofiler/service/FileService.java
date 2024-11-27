@@ -9,6 +9,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
+import java.nio.file.DirectoryIteratorException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,7 +57,7 @@ public final class FileService {
                 }
             }
             return nested;
-        } catch (AccessDeniedException e) {
+        } catch (AccessDeniedException | DirectoryIteratorException e) {
             LOGGER.warn("Failed to get nested paths of {}, due to the lack of access rights", path);
             return nested;
         }

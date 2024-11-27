@@ -8,6 +8,9 @@ import com.isalimzhanov.diskspaceprofiler.util.ExecutorServiceUtils;
 import com.isalimzhanov.diskspaceprofiler.util.FormatUtils;
 import com.isalimzhanov.diskspaceprofiler.view.LoadingTableCell;
 import io.methvin.watcher.DirectoryChangeEvent;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -18,13 +21,16 @@ import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
+import javafx.util.Duration;
 
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.Queue;
 import java.util.ResourceBundle;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -32,12 +38,14 @@ public final class ResourceTreeController implements Initializable {
 
     private static final double NAME_COLUMN_WIDTH_COEFFICIENT = 0.7;
     private static final double SIZE_COLUMN_WIDTH_COEFFICIENT = 0.3;
+    private static final long DEBOUNCE_DELAY_MS = 100;
 
     private final ResourceTreeService resourceTreeService = new ResourceTreeService(new ConcurrentLinkedDeque<>(), new ConcurrentHashMap<>());
+    private final Queue<Runnable> uiUpdateQueue = new ConcurrentLinkedQueue<>();
     private final FileService fileService = new FileService();
 
     // FIXME get correct root
-    private final Path rootPath = Path.of("/home/iskander/IdeaProjects/Folder");
+    private final Path rootPath = Path.of("/home/iskander/");
 
     @FXML
     public HBox warningBox;
@@ -63,19 +71,18 @@ public final class ResourceTreeController implements Initializable {
         setupEventHandlers();
         setupTraversalTask();
         setupRootWatcher();
+        startUIUpdateHandler();
     }
 
     private void setupRootWatcher() {
-        ExecutorServiceUtils.submit(() -> {
-            fileService.watchDirectory(rootPath, event -> {
-                switch (event.eventType()) {
-                    case CREATE -> handleResourceCreatedEvent(event);
-                    case MODIFY -> handleResourceModifiedEvent(event);
-                    case DELETE -> handleResourceDeletedEvent(event);
-                    case OVERFLOW -> handleOverflowEvent(event);
-                }
-            });
-        });
+        ExecutorServiceUtils.submit(() -> fileService.watchDirectory(rootPath, event -> {
+            switch (event.eventType()) {
+                case CREATE -> handleResourceCreatedEvent(event);
+                case MODIFY -> handleResourceModifiedEvent(event);
+                case DELETE -> handleResourceDeletedEvent(event);
+                case OVERFLOW -> handleOverflowEvent(event);
+            }
+        }));
     }
 
     private void handleOverflowEvent(DirectoryChangeEvent event) {
@@ -83,27 +90,27 @@ public final class ResourceTreeController implements Initializable {
     }
 
     private void handleResourceDeletedEvent(DirectoryChangeEvent event) {
-        resourceTreeService.deleteResourceByPath(event.path(), treeTable);
+        scheduleUIUpdate(() -> resourceTreeService.deleteResourceByPath(event.path(), treeTable));
     }
 
     private void handleResourceModifiedEvent(DirectoryChangeEvent event) throws IOException {
         if (event.isDirectory()) {
-            resourceTreeService.updateResourceNameByPath(event.path(), fileService.getName(event.path()));
+            scheduleUIUpdate(() -> resourceTreeService.updateResourceNameByPath(event.path(), fileService.getName(event.path())));
         } else {
             Resource resource = fileService.buildResource(event.path(), fileService.getFileSize(event.path()));
-            resourceTreeService.updateResource(resource);
+            scheduleUIUpdate(() -> resourceTreeService.updateResource(resource));
         }
     }
 
     private void handleResourceCreatedEvent(DirectoryChangeEvent event) throws IOException {
         long size = event.isDirectory() ? 0L : fileService.getFileSize(event.path());
         Resource resource = fileService.buildResource(event.path(), size);
-        resourceTreeService.addOrUpdateResource(resource, treeTable);
+        scheduleUIUpdate(() -> resourceTreeService.addOrUpdateResource(resource, treeTable));
     }
 
     private void setupTraversalTask() {
-        ResourceTraversalTask traversalTask = new ResourceTraversalTask(rootPath, this::addResource, fileService);
-        traversalTask.setOnSucceeded(event -> warningBox.setVisible(false));
+        ResourceTraversalTask traversalTask = new ResourceTraversalTask(rootPath, resource -> scheduleUIUpdate(() -> addResource(resource)), fileService);
+        traversalTask.setOnSucceeded(event -> Platform.runLater(() -> warningBox.setVisible(false)));
         ExecutorServiceUtils.submit(traversalTask);
     }
 
@@ -155,7 +162,25 @@ public final class ResourceTreeController implements Initializable {
     }
 
     public void addResource(Resource resource) {
-        resourceTreeService.addResource(resource, treeTable);
+        scheduleUIUpdate(() -> resourceTreeService.addResource(resource, treeTable));
     }
 
+    private void startUIUpdateHandler() {
+        Timeline timeline = new Timeline(new KeyFrame(Duration.millis(DEBOUNCE_DELAY_MS), e -> processUIUpdates()));
+        timeline.setCycleCount(Timeline.INDEFINITE);
+        timeline.play();
+    }
+
+    private void processUIUpdates() {
+        Platform.runLater(() -> {
+            Runnable task;
+            while ((task = uiUpdateQueue.poll()) != null) {
+                task.run();
+            }
+        });
+    }
+
+    private void scheduleUIUpdate(Runnable task) {
+        uiUpdateQueue.add(task);
+    }
 }
