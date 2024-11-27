@@ -4,6 +4,7 @@ import com.isalimzhanov.diskspaceprofiler.model.Resource;
 import com.isalimzhanov.diskspaceprofiler.service.FileService;
 import com.isalimzhanov.diskspaceprofiler.service.ResourceTraversalTask;
 import com.isalimzhanov.diskspaceprofiler.service.ResourceTreeService;
+import com.isalimzhanov.diskspaceprofiler.service.UsagePieChartService;
 import com.isalimzhanov.diskspaceprofiler.util.ExecutorServiceUtils;
 import com.isalimzhanov.diskspaceprofiler.view.SizeTableCell;
 import io.methvin.watcher.DirectoryChangeEvent;
@@ -14,11 +15,14 @@ import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.chart.PieChart;
 import javafx.scene.control.Button;
+import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeTableCell;
 import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableView;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.util.Duration;
 import org.apache.logging.log4j.LogManager;
@@ -43,11 +47,15 @@ public final class ResourceTreeController implements Initializable {
     private static final long DEBOUNCE_DELAY_MS = 100;
 
     private final ResourceTreeService resourceTreeService = new ResourceTreeService(new ConcurrentLinkedDeque<>(), new ConcurrentHashMap<>());
+    private final UsagePieChartService usagePieChartService = new UsagePieChartService();
     private final Queue<Runnable> uiUpdateQueue = new ConcurrentLinkedQueue<>();
     private final FileService fileService = new FileService();
 
     @FXML
     public HBox warningBox;
+
+    @FXML
+    public PieChart usagePieChart;
 
     @FXML
     private Button goBackButton;
@@ -72,7 +80,20 @@ public final class ResourceTreeController implements Initializable {
         setupTraversalTask();
         setupRootWatcher();
         startUIUpdateHandler();
+        setupUsagePieChart();
         LOGGER.info("Successfully initialized resource tree controller");
+    }
+
+    private void setupUsagePieChart() {
+        treeTable.rootProperty().addListener(
+                (observable, oldValue, newValue) -> updatePieChart(newValue)
+        );
+    }
+
+    private void updatePieChart(TreeItem<Resource> newRoot) {
+        Runnable updateTask = () -> usagePieChartService.updatePieChart(treeTable.getRoot(), usagePieChart);
+        newRoot.valueProperty().addListener((observable, oldValue, newValue) -> Platform.runLater(updateTask));
+        Platform.runLater(updateTask);
     }
 
     private void setupRootWatcher() {
@@ -127,6 +148,8 @@ public final class ResourceTreeController implements Initializable {
         openParentButton.setOnAction(this::handleOpenParentButton);
         treeTable.addEventHandler(MouseEvent.MOUSE_CLICKED, this::handleTreeItemClick);
         treeTable.widthProperty().addListener((observableValue, oldWidth, newWidth) -> updateColumnsWidth(newWidth.doubleValue()));
+        BorderPane parentHBox = (BorderPane) usagePieChart.getParent();
+        usagePieChart.prefWidthProperty().bind(parentHBox.widthProperty().multiply(0.5));
     }
 
     private void updateColumnsWidth(double tableWidth) {
@@ -149,14 +172,13 @@ public final class ResourceTreeController implements Initializable {
     }
 
     private void setupTreeTableColumns() {
-        setupColumn(nameColumn, Resource::getDisplayNameProperty, null);
+        setupColumn(nameColumn, Resource::getDisplayNameProperty);
         setupColumn(sizeColumn, resource -> resource.getSizeProperty().asObject(), SizeTableCell::new);
     }
 
     private <T> void setupColumn(
             TreeTableColumn<Resource, T> column,
-            Function<Resource, ObservableValue<T>> valueFactory,
-            Supplier<TreeTableCell<Resource, T>> cellFactory
+            Function<Resource, ObservableValue<T>> valueFactory
     ) {
         column.setCellValueFactory(cell -> {
             if (cell.getValue() != null && cell.getValue().getValue() != null) {
@@ -164,9 +186,15 @@ public final class ResourceTreeController implements Initializable {
             }
             return null;
         });
-        if (cellFactory != null) {
-            column.setCellFactory(cell -> cellFactory.get());
-        }
+    }
+
+    private <T> void setupColumn(
+            TreeTableColumn<Resource, T> column,
+            Function<Resource, ObservableValue<T>> valueFactory,
+            Supplier<TreeTableCell<Resource, T>> cellFactory
+    ) {
+        setupColumn(column, valueFactory);
+        column.setCellFactory(cell -> cellFactory.get());
     }
 
     public void addResource(Resource resource) {

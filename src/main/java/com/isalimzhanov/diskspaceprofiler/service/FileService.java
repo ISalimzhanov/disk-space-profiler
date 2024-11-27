@@ -72,8 +72,10 @@ public final class FileService {
                 DirectoryWatcher watcher = DirectoryWatcher.builder()
                         .path(path)
                         .listener(listener)
+                        .fileHashing(false)
                         .build();
                 watcher.watchAsync();
+                LOGGER.info("Started watching directory: {}", path);
             } catch (IOException e) {
                 LOGGER.error("Failed to watch directory: {}", path, e);
                 throw new WatchingDirectoryFailedException(path, e);

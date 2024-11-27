@@ -7,7 +7,7 @@
     -fx-vgrow: always;
 }
 
-.button-box,.warning-box {
+.button-box, .warning-box {
     -fx-spacing: 12px;
     -fx-padding: 10px;
     -fx-start-margin: 10px;

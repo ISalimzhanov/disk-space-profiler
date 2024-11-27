@@ -156,11 +156,10 @@
                 <version>0.0.8</version>
                 <executions>
                     <execution>
-                        <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
                             <mainClass>
-                                com.isalimzhanov.diskspaceprofiler/com.isalimzhanov.diskspaceprofiler.DiskSpaceProfiler
+                                com.isalimzhanov.diskspaceprofiler.DiskSpaceProfiler
                             </mainClass>
                             <outputDirectory>/src/main/resources</outputDirectory>
                             <launcher>app</launcher>
