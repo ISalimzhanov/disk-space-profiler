@@ -5,8 +5,7 @@ import com.isalimzhanov.diskspaceprofiler.service.FileService;
 import com.isalimzhanov.diskspaceprofiler.service.ResourceTraversalTask;
 import com.isalimzhanov.diskspaceprofiler.service.ResourceTreeService;
 import com.isalimzhanov.diskspaceprofiler.util.ExecutorServiceUtils;
-import com.isalimzhanov.diskspaceprofiler.util.FormatUtils;
-import com.isalimzhanov.diskspaceprofiler.view.LoadingTableCell;
+import com.isalimzhanov.diskspaceprofiler.view.SizeTableCell;
 import io.methvin.watcher.DirectoryChangeEvent;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -151,7 +150,7 @@ public final class ResourceTreeController implements Initializable {
 
     private void setupTreeTableColumns() {
         setupColumn(nameColumn, Resource::getDisplayNameProperty, null);
-        setupColumn(sizeColumn, resource -> resource.getSizeProperty().asObject(), () -> new LoadingTableCell<>(FormatUtils::formatSize));
+        setupColumn(sizeColumn, resource -> resource.getSizeProperty().asObject(), SizeTableCell::new);
     }
 
     private <T> void setupColumn(
