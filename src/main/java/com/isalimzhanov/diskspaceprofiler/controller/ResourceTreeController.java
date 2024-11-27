@@ -1,6 +1,7 @@
 package com.isalimzhanov.diskspaceprofiler.controller;
 
 import com.isalimzhanov.diskspaceprofiler.model.Resource;
+import com.isalimzhanov.diskspaceprofiler.service.DirectoryWatchingService;
 import com.isalimzhanov.diskspaceprofiler.service.FileService;
 import com.isalimzhanov.diskspaceprofiler.service.ResourceTraversalTask;
 import com.isalimzhanov.diskspaceprofiler.service.ResourceTreeService;
@@ -48,8 +49,10 @@ public final class ResourceTreeController implements Initializable {
 
     private final ResourceTreeService resourceTreeService = new ResourceTreeService(new ConcurrentLinkedDeque<>(), new ConcurrentHashMap<>());
     private final UsagePieChartService usagePieChartService = new UsagePieChartService();
-    private final Queue<Runnable> uiUpdateQueue = new ConcurrentLinkedQueue<>();
     private final FileService fileService = new FileService();
+    private final DirectoryWatchingService directoryWatchingService = new DirectoryWatchingService(fileService);
+    private final Queue<Runnable> uiUpdateQueue = new ConcurrentLinkedQueue<>();
+
 
     @FXML
     public HBox warningBox;
@@ -97,7 +100,7 @@ public final class ResourceTreeController implements Initializable {
     }
 
     private void setupRootWatcher() {
-        ExecutorServiceUtils.submit(() -> fileService.watchRootPaths(event -> {
+        ExecutorServiceUtils.submitDaemon(() -> directoryWatchingService.watchRootPaths(event -> {
             LOGGER.info("Handling directory change event: {}", event);
             try {
                 if (fileService.shouldSkip(event.path())) {
@@ -140,7 +143,7 @@ public final class ResourceTreeController implements Initializable {
     private void setupTraversalTask() {
         ResourceTraversalTask traversalTask = new ResourceTraversalTask(resource -> scheduleUIUpdate(() -> addResource(resource)), fileService);
         traversalTask.setOnSucceeded(event -> Platform.runLater(() -> warningBox.setVisible(false)));
-        ExecutorServiceUtils.submit(traversalTask);
+        ExecutorServiceUtils.submitDaemon(traversalTask);
     }
 
     private void setupEventHandlers() {

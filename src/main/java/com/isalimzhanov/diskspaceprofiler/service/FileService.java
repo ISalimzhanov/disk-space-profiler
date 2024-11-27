@@ -1,9 +1,6 @@
 package com.isalimzhanov.diskspaceprofiler.service;
 
-import com.isalimzhanov.diskspaceprofiler.exception.WatchingDirectoryFailedException;
 import com.isalimzhanov.diskspaceprofiler.model.Resource;
-import io.methvin.watcher.DirectoryChangeListener;
-import io.methvin.watcher.DirectoryWatcher;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -63,24 +60,6 @@ public final class FileService {
             LOGGER.warn("Failed to get nested paths of {}, due to the lack of access rights", path);
             return nested;
         }
-    }
-
-    public void watchRootPaths(DirectoryChangeListener listener) {
-        getRootPaths().forEach(path -> {
-            LOGGER.info("Watching directory: {}", path);
-            try {
-                DirectoryWatcher watcher = DirectoryWatcher.builder()
-                        .path(path)
-                        .listener(listener)
-                        .fileHashing(false)
-                        .build();
-                watcher.watchAsync();
-                LOGGER.info("Started watching directory: {}", path);
-            } catch (IOException e) {
-                LOGGER.error("Failed to watch directory: {}", path, e);
-                throw new WatchingDirectoryFailedException(path, e);
-            }
-        });
     }
 
     public Resource buildResource(Path path, Long size) {

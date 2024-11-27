@@ -43,6 +43,9 @@ public final class ResourceTraversalTask extends Task<Void> {
     }
 
     private void traverse(Path path) {
+        if (Thread.currentThread().isInterrupted()) {
+            return;
+        }
         if (fileService.shouldSkip(path)) {
             return;
         }
