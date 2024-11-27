@@ -22,6 +22,8 @@ import javafx.scene.control.TreeTableView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.util.Duration;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.net.URL;
@@ -35,6 +37,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class ResourceTreeController implements Initializable {
+
+    private static final Logger LOGGER = LogManager.getLogger(ResourceTreeController.class);
 
     private static final double NAME_COLUMN_WIDTH_COEFFICIENT = 0.7;
     private static final double SIZE_COLUMN_WIDTH_COEFFICIENT = 0.3;
@@ -67,29 +71,35 @@ public final class ResourceTreeController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        LOGGER.info("Initializing resource tree controller");
         setupTreeTableColumns();
         setupEventHandlers();
         setupTraversalTask();
         setupRootWatcher();
         startUIUpdateHandler();
+        LOGGER.info("Successfully initialized resource tree controller");
     }
 
     private void setupRootWatcher() {
         ExecutorServiceUtils.submit(() -> fileService.watchDirectory(rootPath, event -> {
-            if (fileService.shouldSkip(event.path())) {
-                return;
-            }
-            switch (event.eventType()) {
-                case CREATE -> handleResourceCreatedEvent(event);
-                case MODIFY -> handleResourceModifiedEvent(event);
-                case DELETE -> handleResourceDeletedEvent(event);
-                case OVERFLOW -> handleOverflowEvent(event);
+            LOGGER.info("Handling directory change event: {}", event);
+            try {
+                if (fileService.shouldSkip(event.path())) {
+                    LOGGER.debug("Skipping event: {}", event);
+                    return;
+                }
+                switch (event.eventType()) {
+                    case CREATE -> handleResourceCreatedEvent(event);
+                    case MODIFY -> handleResourceModifiedEvent(event);
+                    case DELETE -> handleResourceDeletedEvent(event);
+                    default ->
+                            throw new IllegalArgumentException("Unexpected event type " + event.eventType() + " for path " + event.path());
+                }
+                LOGGER.info("Successfully handled directory change event: {}", event);
+            } catch (IOException e) {
+                LOGGER.warn("Failed to handled directory change event: {}", event);
             }
         }));
-    }
-
-    private void handleOverflowEvent(DirectoryChangeEvent event) {
-        // TODO
     }
 
     private void handleResourceDeletedEvent(DirectoryChangeEvent event) {
