@@ -39,8 +39,8 @@ public final class ResourceTraversalTask extends Task<Void> {
     }
 
     private void traverse(Path path) {
-        if (!fileService.doesExist(path)) {
-            LOGGER.error("Path {} doesn't exists", path);
+        if (fileService.shouldSkip(path)) {
+            return;
         }
         try {
             if (fileService.isFile(path)) {

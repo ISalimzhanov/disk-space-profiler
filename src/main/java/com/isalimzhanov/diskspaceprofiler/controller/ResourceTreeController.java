@@ -45,7 +45,7 @@ public final class ResourceTreeController implements Initializable {
     private final FileService fileService = new FileService();
 
     // FIXME get correct root
-    private final Path rootPath = Path.of("/home/iskander/");
+    private final Path rootPath = Path.of("/");
 
     @FXML
     public HBox warningBox;
@@ -76,6 +76,9 @@ public final class ResourceTreeController implements Initializable {
 
     private void setupRootWatcher() {
         ExecutorServiceUtils.submit(() -> fileService.watchDirectory(rootPath, event -> {
+            if (fileService.shouldSkip(event.path())) {
+                return;
+            }
             switch (event.eventType()) {
                 case CREATE -> handleResourceCreatedEvent(event);
                 case MODIFY -> handleResourceModifiedEvent(event);

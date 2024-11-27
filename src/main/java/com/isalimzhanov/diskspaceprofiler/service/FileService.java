@@ -14,15 +14,16 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class FileService {
 
     private static final Logger LOGGER = LogManager.getLogger(FileService.class);
 
-    public boolean doesExist(Path path) {
-        return Files.exists(path) || Files.isSymbolicLink(path);
-    }
+    private static final String[] WINDOWS_SYSTEM_CRITICAL_FOLDERS = new String[]{"C:\\$Recycle.Bin", "C:\\Windows\\System32"};
+    private static final String[] MACOS_SYSTEM_CRITICAL_FOLDERS = new String[]{"/System", "/Library", "/private"};
+    private static final String[] LINUX_SYSTEM_CRITICAL_FOLDERS = new String[]{"/proc", "/sys", "/dev"};
 
     public boolean isDirectory(Path path) {
         return Files.isDirectory(path);
@@ -77,8 +78,26 @@ public final class FileService {
         }
     }
 
-
     public Resource buildResource(Path path, Long size) {
         return Resource.create(getName(path), path, size);
+    }
+
+    public boolean shouldSkip(Path path) {
+        return !Files.isReadable(path) || Files.isSymbolicLink(path) || isSystemCriticalFolder(path);
+    }
+
+    private boolean isSystemCriticalFolder(Path path) {
+        String absolutePath = path.toAbsolutePath().toString();
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            return Arrays.stream(WINDOWS_SYSTEM_CRITICAL_FOLDERS).anyMatch(absolutePath::startsWith);
+        }
+        if (os.contains("mac")) {
+            return Arrays.stream(MACOS_SYSTEM_CRITICAL_FOLDERS).anyMatch(absolutePath::startsWith);
+        }
+        if (os.contains("nix") || os.contains("nux")) {
+            return Arrays.stream(LINUX_SYSTEM_CRITICAL_FOLDERS).anyMatch(absolutePath::startsWith);
+        }
+        return false;
     }
 }
